@@ -1,0 +1,12 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Planny</title>
+    <script src="/s/js/htmx-1.9.9.js"></script>
+    <script src="/s/js/hyperscript-0.9.12.js"></script>
+    <link rel="stylesheet" href="/s/css/styles.css">
+  </head>
+  <body>
+    Yoyo banan {{ count }}
+  </body>
+</html>
