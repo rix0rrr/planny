@@ -1,0 +1,7 @@
+#!/bin/bash
+scriptdir=$(cd $(dirname $0) && pwd)
+cd $scriptdir/..
+
+npx tailwindcss -c tailwind/tailwind.config.js \
+  -i tailwind/base.css \
+  -o static/css/styles.css "$@"
