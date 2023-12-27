@@ -17,7 +17,7 @@
         <h1 class="text-2xl">Planny</h1>
       </header>
 
-      {% include "partials/task-grid" %}
+      <div id="task-grid-container" hx-target="this" hx-swap="morph:innerHTML" hx-get="/tasks" hx-trigger="load"></div>
     </div>
   </body>
 </html>

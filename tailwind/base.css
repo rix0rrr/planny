@@ -22,3 +22,6 @@ table td.plain {
   @apply border-0;
 }
 
+.group-2:hover > .group-2-hover\:visible {
+  visibility: visible;
+}

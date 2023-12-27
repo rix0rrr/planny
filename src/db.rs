@@ -1,53 +1,70 @@
-use anyhow::Result;
-use native_db::DatabaseBuilder;
+use std::{collections::HashMap, fs};
 
-use crate::appstate::Task;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+
+use crate::datamodel::{Task, TaskUpdate};
 
 pub struct Database {
-    builder: DatabaseBuilder,
+    filename: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+struct FullDatabase {
+    pub tasks: HashMap<String, Task>,
 }
 
 impl Database {
-    pub fn new() -> Result<Self> {
-        let mut builder = DatabaseBuilder::new();
-        builder.define::<Task>()?;
-        Ok(Self { builder })
+    pub fn new(filename: String) -> Result<Self> {
+        Ok(Self { filename })
     }
 
-    pub fn open(&self) -> Result<native_db::Database<'_>> {
-        let filename = "db.db";
-        match self.builder.open(filename) {
-            Ok(db) => Ok(db),
-            Err(_) => Ok(self.builder.create(filename)?),
+    fn load(&self) -> Result<FullDatabase> {
+        match fs::File::open(&self.filename) {
+            Ok(f) => Ok(serde_json::from_reader(f)?),
+            Err(_) => Ok(FullDatabase::default()),
         }
     }
 
-    pub fn tasks(&self) -> Result<Vec<Task>> {
-        let db = self.open()?;
-        let tx = db.r_transaction()?;
-        let ts = tx.scan().primary::<Task>()?.all().collect();
-        Ok(ts)
-    }
-
-    pub fn upsert_task(&self, task: Task) -> Result<()> {
-        let db = self.open()?;
-        let tx = db.rw_transaction()?;
-        if let Some(existing) = tx.get().primary::<Task>(task.uid.clone())? {
-            tx.update(existing, task)?;
-        } else {
-            tx.insert(task)?;
-        }
-        tx.commit()?;
+    fn save(&self, db: &FullDatabase) -> Result<()> {
+        let f = fs::File::create(&self.filename)?;
+        serde_json::to_writer_pretty(f, &db)?;
         Ok(())
+    }
+
+    pub fn tasks(&self) -> Result<HashMap<String, Task>> {
+        let db = self.load()?;
+        Ok(db.tasks)
+    }
+
+    pub fn upsert_task(&self, update: TaskUpdate) -> Result<()> {
+        assert!(update.uid != "");
+
+        let mut db = self.load()?;
+        let task_count = db.tasks.len();
+
+        let uid = update.uid.clone();
+        if let Some(existing) = db.tasks.get(&uid) {
+            db.tasks.insert(uid, update.apply(&existing));
+        } else {
+            let mut task = update.apply(&Default::default());
+            // Make sure every task has an ID
+            task.ensure_defaults(task_count);
+            db.tasks.insert(uid, task);
+        }
+        self.save(&db)
     }
 
     pub fn delete_task(&self, uid: &str) -> Result<()> {
-        let db = self.open()?;
-        let tx = db.rw_transaction()?;
-        if let Some(existing) = tx.get().primary::<Task>(uid)? {
-            tx.remove(existing)?;
-        }
-        tx.commit()?;
-        Ok(())
+        let mut db = self.load()?;
+        db.tasks.remove(uid);
+        self.save(&db)
+    }
+
+    pub fn with_task(&self, uid: &str, block: impl FnMut(&mut Task)) -> Result<()> {
+        let mut db = self.load()?;
+        let task = db.tasks.get_mut(uid);
+        task.map(block);
+        self.save(&db)
     }
 }
