@@ -36,10 +36,10 @@ fn index() -> AnyResult<Template> {
 }
 
 #[get("/project/<project_uid>/tasks")]
-fn get_tasks(project_uid: String, db: &State<Db>) -> AnyResult<Template> {
+fn get_tasks(project_uid: &str, db: &State<Db>) -> AnyResult<Template> {
     let task_map: HashMap<String, Task> = HashMap::from_iter(
         db.0.tasks()?
-            .into_many(&project_uid)
+            .into_many(project_uid)
             .map(|t| (t.uid.clone(), t)),
     );
 
@@ -104,12 +104,12 @@ fn get_tasks(project_uid: String, db: &State<Db>) -> AnyResult<Template> {
 }
 
 #[post("/project/<project_uid>/tasks", data = "<form>")]
-fn post_tasks(project_uid: String, form: Form<TaskForm>, db: &State<Db>) -> AnyResult<Template> {
+fn post_tasks(project_uid: &str, form: Form<TaskForm>, db: &State<Db>) -> AnyResult<Template> {
     // Convert add_dependency input (id) into a uid
     let mut add_dependencies: Vec<String> = vec![];
     if let Some(add) = &form.add_dependency {
         if !add.is_empty() {
-            if let Some(t) = db.0.tasks()?.into_many(&project_uid).find(|t| &t.id == add) {
+            if let Some(t) = db.0.tasks()?.into_many(project_uid).find(|t| &t.id == add) {
                 add_dependencies.push(t.uid)
             }
         }
@@ -132,21 +132,21 @@ fn post_tasks(project_uid: String, form: Form<TaskForm>, db: &State<Db>) -> AnyR
 }
 
 #[delete("/project/<project_uid>/tasks/<uid>")]
-fn delete_task(project_uid: String, uid: String, db: &State<Db>) -> AnyResult<Template> {
+fn delete_task(project_uid: &str, uid: &str, db: &State<Db>) -> AnyResult<Template> {
     {
-        db.0.delete_task(&project_uid, &uid)?;
+        db.0.delete_task(project_uid, uid)?;
     }
     get_tasks(project_uid, db)
 }
 
 #[delete("/project/<project_uid>/tasks/<task_uid>/dep/<dep_uid>")]
 fn delete_dep(
-    project_uid: String,
-    task_uid: String,
+    project_uid: &str,
+    task_uid: &str,
     dep_uid: &str,
     db: &State<Db>,
 ) -> AnyResult<Template> {
-    db.0.with_task(&project_uid, &task_uid, |task| {
+    db.0.with_task(project_uid, task_uid, |task| {
         task.dependencies.remove(dep_uid);
     })?;
     get_tasks(project_uid, db)

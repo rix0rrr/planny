@@ -1,14 +1,14 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::{borrow::Borrow, collections::HashMap, marker::PhantomData};
 
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
 
 pub trait HashSortable {
-    type HashKey;
-    type SortKey;
+    type HashKey: ?Sized;
+    type SortKey: ?Sized;
     fn key(&self) -> (&Self::HashKey, &Self::SortKey);
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug)]
 pub struct HSTable<T>
 where
     T: HashSortable,
@@ -41,7 +41,7 @@ where
     pub fn insert(&mut self, x: T) {
         let (pk, sk) = x.key();
         let Some(existing) = self.elements.get_mut(pk) else {
-            self.elements.insert(pk.clone(), vec![x]);
+            self.elements.insert(pk.to_owned(), vec![x]);
             return;
         };
 
@@ -55,38 +55,63 @@ where
         }
     }
 
-    pub fn get(&self, pk: &T::HashKey, sk: &T::SortKey) -> Option<&T> {
+    pub fn get<Q: ?Sized, R: ?Sized>(&self, pk: &Q, sk: &R) -> Option<&T>
+    where
+        T::HashKey: Borrow<Q>,
+        Q: std::hash::Hash + Eq,
+        R: Borrow<T::SortKey>,
+    {
         self.elements.get(pk).and_then(|existing| {
-            match existing.binary_search_by(|a| a.key().1.cmp(sk)) {
+            match existing.binary_search_by(|a| a.key().1.cmp(sk.borrow())) {
                 Ok(i) => existing.get(i),
                 Err(_) => None,
             }
         })
     }
 
-    pub fn get_many(&self, pk: &T::HashKey) -> impl Iterator<Item = &T> + '_ {
+    pub fn get_many<Q: ?Sized>(&self, pk: &Q) -> impl Iterator<Item = &T> + '_
+    where
+        T::HashKey: Borrow<Q>,
+        Q: std::hash::Hash + Eq,
+    {
         self.elements.get(pk).into_iter().flat_map(|xs| xs.iter())
     }
 
-    pub fn into_many(mut self, pk: &T::HashKey) -> impl Iterator<Item = T> {
+    pub fn into_many<Q: ?Sized>(mut self, pk: &Q) -> impl Iterator<Item = T>
+    where
+        T::HashKey: Borrow<Q>,
+        Q: std::hash::Hash + Eq,
+    {
         self.elements
             .remove_entry(pk)
             .into_iter()
             .flat_map(|(_, xs)| xs.into_iter())
     }
 
-    pub fn get_mut(&mut self, pk: &T::HashKey, sk: &T::SortKey) -> Option<&mut T> {
+    pub fn get_mut<Q: ?Sized, R: ?Sized>(&mut self, pk: &Q, sk: &R) -> Option<&mut T>
+    where
+        T::HashKey: Borrow<Q>,
+        Q: std::hash::Hash + Eq,
+        T::SortKey: Borrow<R>,
+        R: Ord,
+    {
         self.elements.get_mut(pk).and_then(|existing| {
-            match existing.binary_search_by(|a| a.key().1.cmp(sk)) {
+            match existing.binary_search_by(|a| a.key().1.borrow().cmp(sk)) {
                 Ok(i) => existing.get_mut(i),
                 Err(_) => None,
             }
         })
     }
 
-    pub fn remove(&mut self, pk: &T::HashKey, sk: &T::SortKey) -> Option<T> {
+    pub fn remove<Q: ?Sized, R: ?Sized>(&mut self, pk: &Q, sk: &R) -> Option<T>
+    where
+        T::HashKey: Borrow<Q>,
+        Q: std::hash::Hash + Eq,
+        T::SortKey: Borrow<R>,
+        R: Ord,
+    {
         self.elements.get_mut(pk).and_then(|existing| {
-            match existing.binary_search_by(|a| a.key().1.cmp(sk)) {
+            match existing.binary_search_by(|a| a.key().1.borrow().cmp(sk)) {
                 Ok(i) => Some(existing.remove(i)),
                 Err(_) => None,
             }
@@ -128,5 +153,16 @@ where
     {
         let x: Vec<T> = Deserialize::deserialize(deserializer)?;
         Ok(HSTable::from_iter(x))
+    }
+}
+
+impl<T: HashSortable> Default for HSTable<T>
+where
+    T: HashSortable,
+    T::HashKey: std::hash::Hash + Eq + Clone,
+    T::SortKey: Ord,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }

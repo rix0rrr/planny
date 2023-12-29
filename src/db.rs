@@ -12,7 +12,7 @@ pub struct Database {
     filename: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct FullDatabase {
     pub tasks: HSTable<Task>,
 }
@@ -58,7 +58,7 @@ impl Database {
         self.save(&db)
     }
 
-    pub fn delete_task(&self, project_uid: &String, uid: &String) -> Result<()> {
+    pub fn delete_task(&self, project_uid: &str, uid: &str) -> Result<()> {
         let mut db = self.load()?;
         db.tasks.remove(project_uid, uid);
         self.save(&db)
@@ -66,8 +66,8 @@ impl Database {
 
     pub fn with_task(
         &self,
-        project_uid: &String,
-        uid: &String,
+        project_uid: &str,
+        uid: &str,
         block: impl FnMut(&mut Task),
     ) -> Result<()> {
         let mut db = self.load()?;
