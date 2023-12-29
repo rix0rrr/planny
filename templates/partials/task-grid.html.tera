@@ -2,16 +2,27 @@
   <table >
     <thead>
       <tr>
+        <th>Type</th>
         <th>ID</th>
         <th>Title</th>
-        <th>Estimate</th>
+        <th>Est.</th>
         <th>Risk</th>
         <th>Dependencies</th>
       </tr>
     </thead>
     <tbody>
-      {% macro row(uid, id, title, estimate, risk, deps) %}
+      {% macro row(uid, id, typ, title, estimate, risk, deps) %}
         <input type="hidden" name="uid" value="{{ uid }}">
+        <td>
+          <select
+            hx-post="/tasks" hx-trigger="change changed delay:100ms"
+            name="type"
+            class="text-xl bg-transparent p-2"
+            >
+            <option value="task" {% if typ == "task" %}selected{% endif %}>✍</option>
+            <option value="milestone" {% if typ == "milestone" %}selected{% endif %}>🏁</option>
+          </select>
+        </td>
         <td>
           <input
             hx-post="/tasks" hx-trigger="change changed delay:100ms"
@@ -19,7 +30,7 @@
             name="id"
             placeholder="ID"
             value="{{ id }}"
-            class="w-12"
+            class="w-12 px-2 py-1"
             >
         </td>
         <td>
@@ -28,9 +39,10 @@
             name="title"
             placeholder="Title"
             value="{{ title }}"
-            class="w-96"
+            class="w-96 px-2 py-1"
             >
         </td>
+        {% if typ == 'task' %}
         <td>
           <input
             hx-post="/tasks" hx-trigger="change changed delay:100ms"
@@ -38,22 +50,26 @@
             name="estimate"
             placeholder="Estimate"
             value="{{ estimate }}"
-            class="w-12"
+            class="w-12 px-2 py-1"
             >
         </td>
         <td>
           <select
             hx-post="/tasks" hx-trigger="change changed delay:100ms"
             name="risk"
-            class="w-24"
+            class="w-24 bg-transparent px-2 py-1"
             >
               <option value="low" {% if risk == "low" %}selected{% endif %}>Low</option>
               <option value="medium" {% if risk == "medium" %}selected{% endif %}>Medium</option>
               <option value="high" {% if risk == "high" %}selected{% endif %}>High</option>
           </select>
         </td>
+        {% else %}
+        <td colspan="2" class="text-gray-400 text-sm italic">(milestone)</td>
+        {% endif %}{# type #}
         <td>
-          <div class="block w-60 flex flex-row flex-wrap gap-2">
+          {% if deps %}
+          <div class="block w-60 flex flex-row flex-wrap gap-1 p-1">
           {% for dep in deps %}
             <span
               class="whitespace-nowrap group-2 flex-0 text-xs font-bold leading-sm uppercase px-3 py-1 bg-blue-200 text-blue-700 rounded-full max-w-32"
@@ -63,13 +79,14 @@
             </span>
           {% endfor %}
           </div>
+          {% endif %}
           <div>
           <input
             hx-post="/tasks" hx-trigger="change changed delay:100ms"
             type="text"
             name="add-dependency"
             placeholder="Depends on"
-            class="w-full min-w-40"
+            class="w-full min-w-40 px-2 py-1"
             list="all-tasks"
             >
           </div>
@@ -78,13 +95,13 @@
 
     {% for task in tasks %}
       <tr hx-include="closest tr" id="row-{{ task.uid }}" class="group">
-        {{ self::row(uid=task.uid, id=task.id, title=task.title, estimate=task.estimate, risk=task.risk, deps=task.dependencies) }}
-        <td class="plain"><button hx-delete="/tasks/{{ task.uid }}" class="invisible group-hover:visible">❌</button></td>
+        {{ self::row(uid=task.uid, typ=task.typ, id=task.id, title=task.title, estimate=task.estimate, risk=task.risk, deps=task.dependencies) }}
+        <td class="plain"><button hx-delete="/tasks/{{ task.uid }}" class="invisible group-hover:visible mx-2">❌</button></td>
       </tr>
     {% endfor %}
     <tr hx-include="closest tr" id="row-{{ fresh_id }}">
         <input type="hidden" name="add" value="true">
-        {{ self::row(uid=fresh_id, id='', title='', estimate='', risk='medium', deps=[]) }}
+        {{ self::row(uid=fresh_id, typ='task', id='', title='', estimate='', risk='medium', deps=[]) }}
     </tr>
     </tbody>
   </table>

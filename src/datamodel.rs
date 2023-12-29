@@ -3,44 +3,69 @@ use std::collections::{HashMap, HashSet};
 use petgraph::{algo::tarjan_scc, graph::DiGraph, matrix_graph::NodeIndex, Graph};
 use serde::{Deserialize, Serialize};
 
+use crate::hstable::HashSortable;
+
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Task {
+    pub project_uid: String,
     pub uid: String,
+    #[serde(default)]
+    pub r#type: TaskType,
     pub id: String,
     pub title: String,
     pub estimate: Option<u32>,
-    pub risk: Risk,
+    pub risk: Option<Risk>,
     pub dependencies: HashSet<String>,
+}
+
+impl HashSortable for Task {
+    type HashKey = String;
+    type SortKey = String;
+
+    fn key(&self) -> (&String, &String) {
+        (&self.project_uid, &self.uid)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct Project {
+    pub uid: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default, FromFormField)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskType {
+    #[default]
+    Task,
+    Milestone,
 }
 
 impl Task {
     pub fn ensure_defaults(&mut self, task_count: usize) {
-        if self.id == "" {
+        if self.id.is_empty() {
             self.id = format!("T{}", task_count + 1);
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, FromFormField)]
+#[derive(Serialize, Deserialize, Debug, Clone, FromFormField, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Risk {
     Low,
+    #[default]
     Medium,
     High,
 }
 
-impl Default for Risk {
-    fn default() -> Self {
-        Risk::Medium
-    }
-}
-
 pub struct TaskUpdate {
+    pub project_uid: String,
     pub uid: String,
+    pub r#type: Option<TaskType>,
     pub id: Option<String>,
     pub title: Option<String>,
     pub estimate: Option<Option<u32>>,
-    pub risk: Option<Risk>,
+    pub risk: Option<Option<Risk>>,
     pub add_dependencies: Vec<String>,
     pub remove_dependencies: Vec<String>,
 }
@@ -48,7 +73,9 @@ pub struct TaskUpdate {
 impl TaskUpdate {
     pub fn apply(self, task: &Task) -> Task {
         Task {
+            project_uid: self.project_uid.clone(),
             uid: self.uid.clone(),
+            r#type: self.r#type.unwrap_or(task.r#type.clone()),
             id: self.id.unwrap_or(task.id.clone()),
             title: self.title.unwrap_or(task.title.clone()),
             estimate: self.estimate.unwrap_or(task.estimate),
@@ -100,14 +127,14 @@ pub fn roughly_sort_tasks<'a>(tasks: impl Iterator<Item = &'a Task> + Clone) -> 
             .filter(|vs| vs.len() > 1)
             .map(|vs| {
                 vs.iter()
-                    .filter_map(|v| g.node_weight(*v).clone())
+                    .filter_map(|v| g.node_weight(*v))
                     .map(|w| w.id.clone())
                     .collect()
             })
             .collect(),
         sorted_tasks: indexes
             .iter()
-            .flat_map(|ts| ts.into_iter())
+            .flat_map(|ts| ts.iter())
             .filter_map(|id| g.node_weight(*id))
             .cloned()
             .collect(),

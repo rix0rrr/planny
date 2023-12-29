@@ -19,6 +19,7 @@ use crate::viewmodel::TaskForm;
 
 mod datamodel;
 mod db;
+mod hstable;
 mod ids;
 mod viewmodel;
 
@@ -34,9 +35,14 @@ fn index() -> AnyResult<Template> {
     Ok(Template::render("index", context! {}))
 }
 
-#[get("/tasks")]
-fn get_tasks(db: &State<Db>) -> AnyResult<Template> {
-    let task_map: HashMap<String, Task> = db.0.tasks()?;
+#[get("/project/<project_uid>/tasks")]
+fn get_tasks(project_uid: String, db: &State<Db>) -> AnyResult<Template> {
+    let task_map: HashMap<String, Task> = HashMap::from_iter(
+        db.0.tasks()?
+            .into_many(&project_uid)
+            .map(|t| (t.uid.clone(), t)),
+    );
+
     let sorted_tasks = roughly_sort_tasks(
         task_map
             .values()
@@ -46,7 +52,7 @@ fn get_tasks(db: &State<Db>) -> AnyResult<Template> {
     // The list of elements in the dependency dropdown
     let task_list = task_map
         .values()
-        .filter(|t| t.id != "")
+        .filter(|t| !t.id.is_empty())
         .map(|t| Choice {
             value: t.id.clone(),
             caption: t.title.clone(),
@@ -59,6 +65,7 @@ fn get_tasks(db: &State<Db>) -> AnyResult<Template> {
         .into_iter()
         .map(|t| TaskView {
             uid: t.uid,
+            typ: t.r#type,
             id: t.id,
             title: t.title,
             estimate: t.estimate,
@@ -96,48 +103,53 @@ fn get_tasks(db: &State<Db>) -> AnyResult<Template> {
     ))
 }
 
-#[post("/tasks", data = "<form>")]
-fn post_tasks(form: Form<TaskForm>, db: &State<Db>) -> AnyResult<Template> {
+#[post("/project/<project_uid>/tasks", data = "<form>")]
+fn post_tasks(project_uid: String, form: Form<TaskForm>, db: &State<Db>) -> AnyResult<Template> {
     // Convert add_dependency input (id) into a uid
     let mut add_dependencies: Vec<String> = vec![];
     if let Some(add) = &form.add_dependency {
-        if add != "" {
-            let tasks = db.0.tasks()?;
-            tasks
-                .into_values()
-                .find(|t| &t.id == add)
-                .map(|t| add_dependencies.push(t.uid));
+        if !add.is_empty() {
+            if let Some(t) = db.0.tasks()?.into_many(&project_uid).find(|t| &t.id == add) {
+                add_dependencies.push(t.uid)
+            }
         }
     }
 
     {
         db.0.upsert_task(TaskUpdate {
+            project_uid: project_uid.to_owned(),
             uid: form.uid.clone(),
+            r#type: Some(form.r#type.clone()),
             id: Some(form.id.clone()),
             title: Some(form.title.clone()),
-            estimate: Some(form.estimate.parse::<u32>().ok()),
-            risk: form.risk.clone(),
+            estimate: form.estimate.as_ref().map(|x| x.parse::<u32>().ok()),
+            risk: form.risk.as_ref().map(|risk| Some(risk.clone())),
             add_dependencies,
             remove_dependencies: vec![],
         })?;
     }
-    get_tasks(db)
+    get_tasks(project_uid, db)
 }
 
-#[delete("/tasks/<uid>")]
-fn delete_task(uid: &str, db: &State<Db>) -> AnyResult<Template> {
+#[delete("/project/<project_uid>/tasks/<uid>")]
+fn delete_task(project_uid: String, uid: String, db: &State<Db>) -> AnyResult<Template> {
     {
-        db.0.delete_task(uid)?;
+        db.0.delete_task(&project_uid, &uid)?;
     }
-    get_tasks(db)
+    get_tasks(project_uid, db)
 }
 
-#[delete("/tasks/<task_uid>/dep/<dep_uid>")]
-fn delete_dep(task_uid: &str, dep_uid: &str, db: &State<Db>) -> AnyResult<Template> {
-    db.0.with_task(task_uid, |task| {
+#[delete("/project/<project_uid>/tasks/<task_uid>/dep/<dep_uid>")]
+fn delete_dep(
+    project_uid: String,
+    task_uid: String,
+    dep_uid: &str,
+    db: &State<Db>,
+) -> AnyResult<Template> {
+    db.0.with_task(&project_uid, &task_uid, |task| {
         task.dependencies.remove(dep_uid);
     })?;
-    get_tasks(db)
+    get_tasks(project_uid, db)
 }
 
 #[launch]

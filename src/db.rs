@@ -1,9 +1,12 @@
-use std::{collections::HashMap, fs};
+use std::fs;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::datamodel::{Task, TaskUpdate};
+use crate::{
+    datamodel::{Task, TaskUpdate},
+    hstable::HSTable,
+};
 
 pub struct Database {
     filename: String,
@@ -11,7 +14,7 @@ pub struct Database {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 struct FullDatabase {
-    pub tasks: HashMap<String, Task>,
+    pub tasks: HSTable<Task>,
 }
 
 impl Database {
@@ -32,38 +35,43 @@ impl Database {
         Ok(())
     }
 
-    pub fn tasks(&self) -> Result<HashMap<String, Task>> {
+    pub fn tasks(&self) -> Result<HSTable<Task>> {
         let db = self.load()?;
         Ok(db.tasks)
     }
 
     pub fn upsert_task(&self, update: TaskUpdate) -> Result<()> {
-        assert!(update.uid != "");
+        assert!(!update.uid.is_empty());
 
         let mut db = self.load()?;
-        let task_count = db.tasks.len();
+        let task_count = db.tasks.get_many(&update.project_uid).count();
 
         let uid = update.uid.clone();
-        if let Some(existing) = db.tasks.get(&uid) {
-            db.tasks.insert(uid, update.apply(&existing));
+        if let Some(existing) = db.tasks.get(&update.project_uid, &uid) {
+            db.tasks.insert(update.apply(existing));
         } else {
             let mut task = update.apply(&Default::default());
             // Make sure every task has an ID
             task.ensure_defaults(task_count);
-            db.tasks.insert(uid, task);
+            db.tasks.insert(task);
         }
         self.save(&db)
     }
 
-    pub fn delete_task(&self, uid: &str) -> Result<()> {
+    pub fn delete_task(&self, project_uid: &String, uid: &String) -> Result<()> {
         let mut db = self.load()?;
-        db.tasks.remove(uid);
+        db.tasks.remove(project_uid, uid);
         self.save(&db)
     }
 
-    pub fn with_task(&self, uid: &str, block: impl FnMut(&mut Task)) -> Result<()> {
+    pub fn with_task(
+        &self,
+        project_uid: &String,
+        uid: &String,
+        block: impl FnMut(&mut Task),
+    ) -> Result<()> {
         let mut db = self.load()?;
-        let task = db.tasks.get_mut(uid);
+        let task = db.tasks.get_mut(project_uid, uid);
         task.map(block);
         self.save(&db)
     }
