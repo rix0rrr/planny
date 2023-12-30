@@ -20,6 +20,12 @@ pub struct TaskForm {
     pub add_dependency: Option<String>,
 }
 
+#[derive(FromForm, Debug, Clone)]
+pub struct ProjectNameForm {
+    #[field(name = "project-name")]
+    pub project_name: String,
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub struct Choice {
     pub value: String,

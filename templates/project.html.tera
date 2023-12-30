@@ -1,0 +1,20 @@
+{% extends "layout" %}
+{% block main %}
+    <div class="mx-auto w-full max-w-screen-lg text-lg">
+      <header class="bg-gray-200 h-24 mb-4" id="header">
+        <h1 class="text-lg"><a href="/">Planny</a></h1>
+        <div id="name">
+          <span class="text-2xl">{{ project.name }}</span>
+          <button _="on click remove .hidden from #edit-name then add .hidden to #name">Change</button>
+        </div>
+        <div id="edit-name" class="hidden">
+          <form hx-post="/project/{{project.uid}}/name" hx-include="#edit-name" hx-target="#header" hx-select="#header">
+          <input type="text" class="text-2xl" value="{{project.name}}" id="project-name" name="project-name">
+          <button type="submit">Submit</button>
+          <button type="button" _="on click remove .hidden from #name then add .hidden to #edit-name">Cancel</button>
+        </div>
+      </header>
+
+      <div id="task-grid-container" hx-target="this" hx-swap="morph:innerHTML" hx-get="/project/{{project.uid}}/tasks" hx-trigger="load"></div>
+    </div>
+{% endblock %}

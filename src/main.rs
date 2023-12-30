@@ -10,10 +10,11 @@ use itertools::Itertools;
 use rocket::{
     form::Form,
     fs::{relative, FileServer},
+    response::Redirect,
     State,
 };
 use rocket_dyn_templates::{context, Template};
-use viewmodel::{Choice, TaskDependencyView, TaskView};
+use viewmodel::{Choice, ProjectNameForm, TaskDependencyView, TaskView};
 
 use crate::viewmodel::TaskForm;
 
@@ -31,12 +32,51 @@ struct Db(Database);
 type AnyResult<T> = Result<T, rocket::response::Debug<anyhow::Error>>;
 
 #[get("/")]
-fn index() -> AnyResult<Template> {
-    Ok(Template::render("index", context! {}))
+fn index(db: &State<Db>) -> AnyResult<Template> {
+    let projects = db.0.projects()?;
+    Ok(Template::render(
+        "index",
+        context! {
+            projects,
+        },
+    ))
+}
+
+#[get("/project/<project_uid>")]
+fn get_project(project_uid: &str, db: &State<Db>) -> AnyResult<Template> {
+    let project = db.0.project(project_uid)?;
+    Ok(Template::render(
+        "project",
+        context! {
+            project,
+        },
+    ))
+}
+
+#[post("/projects/create")]
+fn create_project(db: &State<Db>) -> AnyResult<Redirect> {
+    let uid = db.0.new_project()?;
+    Ok(Redirect::moved(format!("/project/{}", uid)))
+}
+
+#[post("/project/<project_uid>/name", data = "<form>")]
+fn post_project_name(
+    project_uid: &str,
+    form: Form<ProjectNameForm>,
+    db: &State<Db>,
+) -> AnyResult<Template> {
+    if !form.project_name.is_empty() {
+        db.0.with_project(project_uid, |proj| {
+            proj.name = form.project_name.clone();
+        })?;
+    }
+    get_project(project_uid, db)
 }
 
 #[get("/project/<project_uid>/tasks")]
 fn get_tasks(project_uid: &str, db: &State<Db>) -> AnyResult<Template> {
+    let project = db.0.project(project_uid)?;
+
     let task_map: HashMap<String, Task> = HashMap::from_iter(
         db.0.tasks()?
             .into_many(project_uid)
@@ -95,7 +135,9 @@ fn get_tasks(project_uid: &str, db: &State<Db>) -> AnyResult<Template> {
     Ok(Template::render(
         "partials/task-grid",
         context! {
+            project_uid: project_uid,
             fresh_id: unique_id(),
+            project,
             tasks,
             task_list,
             warnings,
@@ -157,7 +199,16 @@ fn rocket() -> _ {
     rocket::build()
         .mount(
             "/",
-            routes![index, get_tasks, post_tasks, delete_task, delete_dep],
+            routes![
+                index,
+                get_tasks,
+                post_tasks,
+                delete_task,
+                delete_dep,
+                get_project,
+                post_project_name,
+                create_project,
+            ],
         )
         .mount("/s", FileServer::from(relative!("/static")))
         .attach(Template::fairing())

@@ -15,7 +15,7 @@
         <input type="hidden" name="uid" value="{{ uid }}">
         <td>
           <select
-            hx-post="/tasks" hx-trigger="change changed delay:100ms"
+            hx-post="/project/{{project.uid}}/tasks" hx-trigger="change changed delay:100ms"
             name="type"
             class="text-xl bg-transparent p-2"
             >
@@ -25,7 +25,7 @@
         </td>
         <td>
           <input
-            hx-post="/tasks" hx-trigger="change changed delay:100ms"
+            hx-post="/project/{{project.uid}}/tasks" hx-trigger="change changed delay:100ms"
             type="text"
             name="id"
             placeholder="ID"
@@ -34,7 +34,7 @@
             >
         </td>
         <td>
-          <input hx-post="/tasks" hx-trigger="change changed delay:100ms"
+          <input hx-post="/project/{{project.uid}}/tasks" hx-trigger="change changed delay:100ms"
             type="text"
             name="title"
             placeholder="Title"
@@ -45,7 +45,7 @@
         {% if typ == 'task' %}
         <td>
           <input
-            hx-post="/tasks" hx-trigger="change changed delay:100ms"
+            hx-post="/project/{{project.uid}}/tasks" hx-trigger="change changed delay:100ms"
             type="text"
             name="estimate"
             placeholder="Estimate"
@@ -55,7 +55,7 @@
         </td>
         <td>
           <select
-            hx-post="/tasks" hx-trigger="change changed delay:100ms"
+            hx-post="/project/{{project.uid}}/tasks" hx-trigger="change changed delay:100ms"
             name="risk"
             class="w-24 bg-transparent px-2 py-1"
             >
@@ -75,14 +75,14 @@
               class="whitespace-nowrap group-2 flex-0 text-xs font-bold leading-sm uppercase px-3 py-1 bg-blue-200 text-blue-700 rounded-full max-w-32"
               title="{{dep.id}} {{ dep.title}}">
               {{ dep.id }} {{ dep.title }}
-              <button hx-delete="/tasks/{{ uid }}/dep/{{dep.uid}}" class="invisible group-2-hover:visible">❌</button>
+              <button hx-delete="/project/{{ project.uid }}/task/{{ uid }}/dep/{{dep.uid}}" class="invisible group-2-hover:visible">❌</button>
             </span>
           {% endfor %}
           </div>
           {% endif %}
           <div>
           <input
-            hx-post="/tasks" hx-trigger="change changed delay:100ms"
+            hx-post="/project/{{ project.uid }}" hx-trigger="change changed delay:100ms"
             type="text"
             name="add-dependency"
             placeholder="Depends on"
@@ -96,7 +96,7 @@
     {% for task in tasks %}
       <tr hx-include="closest tr" id="row-{{ task.uid }}" class="group">
         {{ self::row(uid=task.uid, typ=task.typ, id=task.id, title=task.title, estimate=task.estimate, risk=task.risk, deps=task.dependencies) }}
-        <td class="plain"><button hx-delete="/tasks/{{ task.uid }}" class="invisible group-hover:visible mx-2">❌</button></td>
+        <td class="plain"><button hx-delete="/project/{{ project.uid }}/task/{{ task.uid }}" class="invisible group-hover:visible mx-2">❌</button></td>
       </tr>
     {% endfor %}
     <tr hx-include="closest tr" id="row-{{ fresh_id }}">

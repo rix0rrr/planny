@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Planny</title>
+    <script src="/s/js/htmx-1.9.9.js"></script>
+    <script src="/s/js/hyperscript-0.9.12.js"></script>
+    <script src="/s/js/idiomorph-ext.min.js"></script>
+    <link rel="stylesheet" href="/s/css/styles.css">
+  </head>
+  <body hx-ext="morph" _="on htmx:responseError put detail.error into #error-msg then remove .hidden from #error-box">
+    <div id="error-box" class="bg-red-300 p-4 hidden">
+      <span id="error-msg"></span>
+      (<button _="on click add .hidden to #error-box" class="font-bold">Close</button>)
+    </div>
+    {% block main %}
+    {% endblock %}
+  </body>
+</html>

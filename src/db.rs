@@ -4,8 +4,9 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    datamodel::{Task, TaskUpdate},
+    datamodel::{Project, Task, TaskUpdate},
     hstable::HSTable,
+    ids::unique_id,
 };
 
 pub struct Database {
@@ -13,8 +14,10 @@ pub struct Database {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
 struct FullDatabase {
     pub tasks: HSTable<Task>,
+    pub projects: HSTable<Project>,
 }
 
 impl Database {
@@ -40,6 +43,28 @@ impl Database {
         Ok(db.tasks)
     }
 
+    pub fn projects(&self) -> Result<HSTable<Project>> {
+        let db = self.load()?;
+        Ok(db.projects)
+    }
+
+    pub fn project(&self, uid: &str) -> Result<Option<Project>> {
+        let db = self.load()?;
+        Ok(db.projects.get1(uid).cloned())
+    }
+
+    pub fn new_project(&self) -> Result<String> {
+        let uid = unique_id();
+
+        let mut db = self.load()?;
+        db.projects.insert(Project {
+            uid: uid.clone(),
+            name: "New project".to_owned(),
+        });
+        self.save(&db)?;
+        Ok(uid)
+    }
+
     pub fn upsert_task(&self, update: TaskUpdate) -> Result<()> {
         assert!(!update.uid.is_empty());
 
@@ -47,7 +72,7 @@ impl Database {
         let task_count = db.tasks.get_many(&update.project_uid).count();
 
         let uid = update.uid.clone();
-        if let Some(existing) = db.tasks.get(&update.project_uid, &uid) {
+        if let Some(existing) = db.tasks.get2(&update.project_uid, &uid) {
             db.tasks.insert(update.apply(existing));
         } else {
             let mut task = update.apply(&Default::default());
@@ -60,7 +85,14 @@ impl Database {
 
     pub fn delete_task(&self, project_uid: &str, uid: &str) -> Result<()> {
         let mut db = self.load()?;
-        db.tasks.remove(project_uid, uid);
+        db.tasks.remove2(project_uid, uid);
+        self.save(&db)
+    }
+
+    pub fn with_project(&self, project_uid: &str, block: impl FnMut(&mut Project)) -> Result<()> {
+        let mut db = self.load()?;
+        let project = db.projects.get1_mut(project_uid);
+        project.map(block);
         self.save(&db)
     }
 
@@ -71,7 +103,7 @@ impl Database {
         block: impl FnMut(&mut Task),
     ) -> Result<()> {
         let mut db = self.load()?;
-        let task = db.tasks.get_mut(project_uid, uid);
+        let task = db.tasks.get2_mut(project_uid, uid);
         task.map(block);
         self.save(&db)
     }

@@ -3,13 +3,13 @@ use std::collections::{HashMap, HashSet};
 use petgraph::{algo::tarjan_scc, graph::DiGraph, matrix_graph::NodeIndex, Graph};
 use serde::{Deserialize, Serialize};
 
-use crate::hstable::HashSortable;
+use crate::hstable::{HashColl, Hashable, SortColl, Sortable};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(default)]
 pub struct Task {
     pub project_uid: String,
     pub uid: String,
-    #[serde(default)]
     pub r#type: TaskType,
     pub id: String,
     pub title: String,
@@ -18,19 +18,37 @@ pub struct Task {
     pub dependencies: HashSet<String>,
 }
 
-impl HashSortable for Task {
+impl Hashable for Task {
+    type Coll = SortColl<Task>;
     type HashKey = String;
+
+    fn hash_key(&self) -> &String {
+        &self.project_uid
+    }
+}
+
+impl Sortable for Task {
     type SortKey = String;
 
-    fn key(&self) -> (&String, &String) {
-        (&self.project_uid, &self.uid)
+    fn sort_key(&self) -> &String {
+        &self.uid
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(default)]
 pub struct Project {
     pub uid: String,
     pub name: String,
+}
+
+impl Hashable for Project {
+    type Coll = HashColl<Project>;
+    type HashKey = String;
+
+    fn hash_key(&self) -> &String {
+        &self.uid
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, FromFormField)]
