@@ -1,0 +1,10 @@
+<div>Amount of people in this project</div>
+<input
+  hx-post="/project/{{project.uid}}/people" hx-trigger="change changed delay:100ms"
+  type="number"
+  name="people"
+  placeholder="People"
+  value="{{ project.people }}"
+  class="w-24 px-2 py-1"
+  min="1"
+  >

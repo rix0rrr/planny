@@ -16,6 +16,7 @@ pub struct Task {
     pub estimate: Option<u32>,
     pub risk: Option<Risk>,
     pub dependencies: HashSet<String>,
+    // TODO: Max parallellization, specialization
 }
 
 impl Hashable for Task {
@@ -35,11 +36,22 @@ impl Sortable for Task {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct Project {
     pub uid: String,
     pub name: String,
+    pub people: u32,
+}
+
+impl Default for Project {
+    fn default() -> Self {
+        Self {
+            uid: Default::default(),
+            name: Default::default(),
+            people: 1,
+        }
+    }
 }
 
 impl Hashable for Project {

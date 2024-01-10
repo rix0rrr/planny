@@ -1,0 +1,32 @@
+{% if cycles %}
+The following tasks have a cycle!
+<ul>
+  {% for cycle in cycles %}
+  <li>{{ cycle | join(sep=" → ") }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if task_percentiles %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th><th>Title</th>
+      {% for p in percentiles %}
+      <th>{{ p }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for tp in task_percentiles %}
+    <tr>
+      <td>{{ tp.task.id }}</td>
+      <td>{{ tp.task.title }}</td>
+      {% for p in tp.end_percentiles %}
+      <td>{{ p.1 }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

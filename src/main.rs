@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use datamodel::{roughly_sort_tasks, Task, TaskUpdate};
 use db::Database;
+use forecast::simulate_tasks;
 use ids::unique_id;
 use itertools::Itertools;
 use rocket::{
@@ -14,14 +15,18 @@ use rocket::{
     State,
 };
 use rocket_dyn_templates::{context, Template};
-use viewmodel::{Choice, ProjectNameForm, TaskDependencyView, TaskView};
+use serde::Serialize;
+use viewmodel::{Choice, ProjectNameForm, ProjectPeopleForm, TaskDependencyView, TaskView};
 
 use crate::viewmodel::TaskForm;
 
 mod datamodel;
 mod db;
+mod forecast;
 mod hstable;
 mod ids;
+mod svg;
+mod topo_queue;
 mod viewmodel;
 
 // Not sure why I need a wrapper type, but if I use Database directly
@@ -145,6 +150,84 @@ fn get_tasks(project_uid: &str, db: &State<Db>) -> AnyResult<Template> {
     ))
 }
 
+#[get("/project/<project_uid>/people")]
+fn get_people(project_uid: &str, db: &State<Db>) -> AnyResult<Template> {
+    let project = db.0.project(project_uid)?.unwrap();
+    Ok(Template::render(
+        "partials/people",
+        context! {
+            project,
+        },
+    ))
+}
+
+#[post("/project/<project_uid>/people", data = "<form>")]
+fn post_people(
+    project_uid: &str,
+    form: Form<ProjectPeopleForm>,
+    db: &State<Db>,
+) -> AnyResult<Template> {
+    db.0.with_project(project_uid, |project| {
+        if form.people > 0 {
+            project.people = form.people;
+        }
+    })?;
+    get_people(project_uid, db)
+}
+
+#[get("/project/<project_uid>/forecast")]
+fn get_forecast(project_uid: &str, db: &State<Db>) -> AnyResult<Option<Template>> {
+    let Some(project) = db.0.project(project_uid)? else {
+        return Ok(None);
+    };
+
+    let tasks = db.0.tasks()?.into_many(project_uid).collect_vec();
+    let sorted_tasks = roughly_sort_tasks(tasks.iter());
+    if !sorted_tasks.cycles.is_empty() {
+        return Ok(Some(Template::render(
+            "partials/forecast",
+            context! {
+                cycles: sorted_tasks.cycles
+            },
+        )));
+    }
+
+    let rs = simulate_tasks(tasks.into_iter(), project.people);
+    #[derive(Serialize)]
+    struct TaskPercentiles {
+        task: Task,
+        end_percentiles: Vec<(u32, f64)>,
+    }
+    let percentiles = vec![0, 10, 50, 90, 100];
+    let task_percentiles: Vec<TaskPercentiles> = sorted_tasks
+        .sorted_tasks
+        .iter()
+        .map(|task| TaskPercentiles {
+            task: task.clone(),
+            end_percentiles: percentiles
+                .iter()
+                .map(|p| {
+                    (
+                        *p,
+                        rs.task_stats
+                            .get(&task.uid)
+                            .and_then(|x| x.end.query(*p as f64 / 100.0).map(|x| x.1))
+                            .unwrap_or(666_f64),
+                    )
+                })
+                .collect(),
+        })
+        .collect();
+
+    Ok(Some(Template::render(
+        "partials/forecast",
+        context! {
+            percentiles,
+            task_percentiles,
+        },
+    )))
+}
+
 #[post("/project/<project_uid>/tasks", data = "<form>")]
 fn post_tasks(project_uid: &str, form: Form<TaskForm>, db: &State<Db>) -> AnyResult<Template> {
     // Convert add_dependency input (id) into a uid
@@ -208,6 +291,9 @@ fn rocket() -> _ {
                 get_project,
                 post_project_name,
                 create_project,
+                get_people,
+                post_people,
+                get_forecast,
             ],
         )
         .mount("/s", FileServer::from(relative!("/static")))

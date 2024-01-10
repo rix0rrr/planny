@@ -33,3 +33,11 @@ table td.plain {
 .group-2:hover > .group-2-hover\:visible {
   visibility: visible;
 }
+
+.tab {
+  @apply py-4 px-6 block font-medium hover:text-blue-500 focus:outline-none text-gray-600;
+}
+
+.tab.selected {
+  @apply text-blue-500 border-b-2 font-medium border-blue-500;
+}

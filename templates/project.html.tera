@@ -15,6 +15,35 @@
         </div>
       </header>
 
-      <div id="task-grid-container" hx-target="this" hx-swap="morph:innerHTML" hx-get="/project/{{project.uid}}/tasks" hx-trigger="load"></div>
+      <div class="bg-white">
+        <nav class="flex flex-col sm:flex-row">
+            <button
+              class="tab selected"
+              hx-get="/project/{{project.uid}}/tasks"
+              hx-target="#project-tab"
+              _="on click remove .selected from .tab then add .selected to me"
+              >
+                Tasks
+            </button>
+            <button
+              class="tab"
+              hx-get="/project/{{project.uid}}/people"
+              hx-target="#project-tab"
+              _="on click remove .selected from .tab then add .selected to me"
+              >
+                People
+            </button>
+            <button
+              class="tab"
+              hx-get="/project/{{project.uid}}/forecast"
+              hx-target="#project-tab"
+              _="on click remove .selected from .tab then add .selected to me"
+              >
+                Forecast
+            </button>
+        </nav>
+      </div>
+
+      <div id="project-tab" hx-target="this" hx-swap="morph:innerHTML" hx-get="/project/{{project.uid}}/tasks" hx-trigger="load"></div>
     </div>
 {% endblock %}

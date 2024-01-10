@@ -21,6 +21,11 @@ pub struct TaskForm {
 }
 
 #[derive(FromForm, Debug, Clone)]
+pub struct ProjectPeopleForm {
+    pub people: u32,
+}
+
+#[derive(FromForm, Debug, Clone)]
 pub struct ProjectNameForm {
     #[field(name = "project-name")]
     pub project_name: String,

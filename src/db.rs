@@ -60,6 +60,7 @@ impl Database {
         db.projects.insert(Project {
             uid: uid.clone(),
             name: "New project".to_owned(),
+            ..Default::default()
         });
         self.save(&db)?;
         Ok(uid)
