@@ -1,7 +1,11 @@
 #[macro_use]
 extern crate rocket;
 
-use std::collections::HashMap;
+use std::{
+    cmp::{max, min},
+    collections::HashMap,
+    ops::Range,
+};
 
 use datamodel::{roughly_sort_tasks, Task, TaskUpdate};
 use db::Database;
@@ -18,13 +22,19 @@ use rocket_dyn_templates::{context, Template};
 use serde::Serialize;
 use viewmodel::{Choice, ProjectNameForm, ProjectPeopleForm, TaskDependencyView, TaskView};
 
-use crate::viewmodel::TaskForm;
+use crate::{
+    forecast::{convert_rng, query_minmax},
+    render_forecast::render_dist,
+    svg::RenderedSvg,
+    viewmodel::TaskForm,
+};
 
 mod datamodel;
 mod db;
 mod forecast;
 mod hstable;
 mod ids;
+mod render_forecast;
 mod svg;
 mod topo_queue;
 mod viewmodel;
@@ -88,11 +98,7 @@ fn get_tasks(project_uid: &str, db: &State<Db>) -> AnyResult<Template> {
             .map(|t| (t.uid.clone(), t)),
     );
 
-    let sorted_tasks = roughly_sort_tasks(
-        task_map
-            .values()
-            .sorted_by(|a, b| human_sort::compare(&a.id, &b.id)),
-    );
+    let sorted_tasks = roughly_sort_tasks(task_map.values());
 
     // The list of elements in the dependency dropdown
     let task_list = task_map
@@ -194,36 +200,41 @@ fn get_forecast(project_uid: &str, db: &State<Db>) -> AnyResult<Option<Template>
 
     let rs = simulate_tasks(tasks.into_iter(), project.people);
     #[derive(Serialize)]
-    struct TaskPercentiles {
+    struct TaskPrediction {
         task: Task,
-        end_percentiles: Vec<(u32, f64)>,
+        full_rng: Range<u32>,
+        full_svg: RenderedSvg,
     }
-    let percentiles = vec![0, 10, 50, 90, 100];
-    let task_percentiles: Vec<TaskPercentiles> = sorted_tasks
+    let task_timeline: Vec<TaskPrediction> = sorted_tasks
         .sorted_tasks
         .iter()
-        .map(|task| TaskPercentiles {
-            task: task.clone(),
-            end_percentiles: percentiles
-                .iter()
-                .map(|p| {
-                    (
-                        *p,
-                        rs.task_stats
-                            .get(&task.uid)
-                            .and_then(|x| x.end.query(*p as f64 / 100.0).map(|x| x.1))
-                            .unwrap_or(666_f64),
-                    )
-                })
-                .collect(),
+        .map(|task| {
+            let rng = rs.task_stats.get(&task.uid).unwrap();
+
+            let start_rng = convert_rng(&query_minmax(&rng.start, 0.01));
+            let end_rng = convert_rng(&query_minmax(&rng.end, 0.01));
+
+            let full_rng = start_rng.start..end_rng.end;
+
+            println!("Task {} {:?}", task.id, full_rng);
+
+            TaskPrediction {
+                task: task.clone(),
+                full_svg: render_dist(&rng.start, &rng.end, &full_rng).render(),
+                full_rng,
+            }
         })
         .collect();
+
+    let time_range = task_timeline.iter().fold(0..0, |r, x| {
+        min(r.start, x.full_rng.start)..max(r.end, x.full_rng.end)
+    });
 
     Ok(Some(Template::render(
         "partials/forecast",
         context! {
-            percentiles,
-            task_percentiles,
+            task_timeline,
+            time_range: time_range.collect_vec(),
         },
     )))
 }

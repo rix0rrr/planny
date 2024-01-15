@@ -10,8 +10,9 @@ anyhow = "1.0.76"
 human-sort = "0.2.2"
 itertools = "0.12.0"
 petgraph = "0.6.4"
-quantiles = "0.7.1"
+quantogram = "0.4.4"
 rand = "0.8.5"
+rand_distr = "0.4.3"
 rocket = { version = "0.5.0", features = ["secrets"] }
 rocket_dyn_templates = { version = "^0.1.0", features = ["tera"] }
 serde = { version = "^1.0", features = ["derive"] }

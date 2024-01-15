@@ -2,10 +2,13 @@ use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use itertools::Itertools;
 
+type IdSet = HashSet<String>;
+type TaskMap = HashMap<String, IdSet>;
+
 #[derive(Clone, Debug, Default)]
 pub struct TopoQueue {
-    deps: HashMap<String, HashSet<String>>,
-    unblocks: HashMap<String, HashSet<String>>,
+    current_deps: TaskMap,
+    unblocks: TaskMap,
     available: HashSet<String>,
 }
 
@@ -13,12 +16,12 @@ impl TopoQueue {
     pub fn from_iter(iter: impl IntoIterator<Item = (String, HashSet<String>)>) -> Self {
         let deps = HashMap::from_iter(iter);
         let mut ret = TopoQueue {
-            deps,
+            current_deps: deps.clone(),
             ..Default::default()
         };
 
         // Invert the dependencies
-        for (key, deps) in &ret.deps {
+        for (key, deps) in &ret.current_deps {
             for dep in deps {
                 match ret.unblocks.entry(dep.clone()) {
                     Entry::Occupied(mut e) => {
@@ -36,7 +39,7 @@ impl TopoQueue {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.available.len() + self.deps.len() == 0
+        self.available.len() + self.current_deps.len() == 0
     }
 
     pub fn available(&self) -> impl Iterator<Item = &String> {
@@ -48,7 +51,7 @@ impl TopoQueue {
         self.available.remove(x);
         if let Some(unblocks) = self.unblocks.remove(x) {
             for t in unblocks {
-                self.deps.get_mut(&t).unwrap().remove(x);
+                self.current_deps.get_mut(&t).unwrap().remove(x);
             }
         }
         self.update_available();
@@ -56,14 +59,14 @@ impl TopoQueue {
 
     fn update_available(&mut self) {
         let available = self
-            .deps
+            .current_deps
             .iter()
             .filter(|(_, d)| d.is_empty())
             .map(|(k, _)| k)
             .cloned()
             .collect_vec();
         for k in &available {
-            self.deps.remove(k);
+            self.current_deps.remove(k);
         }
         self.available.extend(available);
     }

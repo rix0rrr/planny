@@ -7,26 +7,45 @@ The following tasks have a cycle!
 </ul>
 {% endif %}
 
-{% if task_percentiles %}
-<table>
-  <thead>
-    <tr>
-      <th>ID</th><th>Title</th>
-      {% for p in percentiles %}
-      <th>{{ p }}</th>
-      {% endfor %}
-    </tr>
-  </thead>
-  <tbody>
-    {% for tp in task_percentiles %}
-    <tr>
-      <td>{{ tp.task.id }}</td>
-      <td>{{ tp.task.title }}</td>
-      {% for p in tp.end_percentiles %}
-      <td>{{ p.1 }}</td>
-      {% endfor %}
-    </tr>
+{% if task_timeline %}
+{% set hscale = 30 %}
+{% set vscale = 40 %}
+
+<div id="timeline-container" class="bg-blue-200 overflow-auto w-full px-4 pb-4">
+  <div class="grid gap-4 items-center" style="grid-template-columns: repeat(2, max-content);">
+  <div></div>
+  <div class="relative h-5">
+    {% for day in time_range %}
+      {% if day > 0 and day % 5 == 0 %}{% set marker = true %}{% else %}{% set marker = false %}{% endif %}
+      <div
+        class="absolute text-sm text-gray-600 h-full border-solid border-black {% if not marker %}border-l{% endif %}"
+        style="left: {{ day * hscale }}px;">{% if marker %}{{day}}{% endif %}</div>
     {% endfor %}
-  </tbody>
-</table>
+  </div>
+  {% for row in task_timeline %}
+  <!-- Label -->
+  <div class="{% if row.task.type == "Milestone" %}color-red{% endif %}">
+    {{row.task.id}} {{row.task.title}}
+  </div>
+  <!-- Track container -->
+  <div>
+  <!-- Track -->
+    <div class="relative border-b-2 border-solid border-blue-300" style="height: {{vscale}}px; width: {{ row.full_rng.end * hscale }}px;">
+      <!-- Full -->
+      <svg
+        class="absolute h-full"
+        style="left: {{ row.full_rng.start * hscale }}px; width: {{ row.full_rng.end * hscale - row.full_rng.start * hscale }}px;"
+        xmlns="http://www.w3.org/2000/svg" viewBox="{{ row.full_svg.view_box }}"
+        width="100%" height="100%" preserveAspectRatio="none"
+        >
+
+        <path d="{{ row.full_svg.paths.0 }}" fill="white" />
+      </svg>
+    </div>
+  </div>
+
+  {% endfor %}
+  </div>
+</div>
+
 {% endif %}

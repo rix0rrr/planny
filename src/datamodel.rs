@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use itertools::Itertools;
 use petgraph::{algo::tarjan_scc, graph::DiGraph, matrix_graph::NodeIndex, Graph};
 use serde::{Deserialize, Serialize};
 
@@ -63,7 +64,7 @@ impl Hashable for Project {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, FromFormField)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, FromFormField, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum TaskType {
     #[default]
@@ -148,6 +149,7 @@ fn make_dependency_graph<'a>(tasks: impl Iterator<Item = &'a Task> + Clone) -> G
 ///
 /// This will not fail if there are cycles.
 pub fn roughly_sort_tasks<'a>(tasks: impl Iterator<Item = &'a Task> + Clone) -> SortedTasks {
+    let tasks = tasks.sorted_by(|a, b| human_sort::compare(&a.id, &b.id));
     let g = make_dependency_graph(tasks);
     let indexes = tarjan_scc(&g);
 

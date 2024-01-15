@@ -1,24 +1,27 @@
 use itertools::Itertools;
-use rand::seq::IteratorRandom; // 0.7.2
+use rand::seq::IteratorRandom;
+use rand_distr::{Distribution, LogNormal}; // 0.7.2
 use std::{cmp::max, collections::HashMap, ops::Range};
 
-use quantiles::ckms::CKMS;
+use quantogram::Quantogram;
 
-use crate::{datamodel::Task, topo_queue::TopoQueue};
+use crate::{
+    datamodel::{Task, TaskType},
+    topo_queue::TopoQueue,
+};
 
 const N: u32 = 1000;
-const ERROR: f64 = 0.001;
 
 pub struct SimulationResults {
-    pub task_stats: HashMap<String, Range<CKMS<f64>>>,
+    pub task_stats: HashMap<String, Range<Quantogram>>,
 }
 
 pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> SimulationResults {
     let tasks: HashMap<String, Task> = HashMap::from_iter(tasks.map(|t| (t.uid.clone(), t)));
-    let mut stats: HashMap<String, Range<CKMS<f64>>> = HashMap::from_iter(
+    let mut stats: HashMap<String, Range<Quantogram>> = HashMap::from_iter(
         tasks
             .keys()
-            .map(|k| (k.clone(), CKMS::new(ERROR)..CKMS::new(ERROR))),
+            .map(|k| (k.clone(), Quantogram::new()..Quantogram::new())),
     );
 
     let mut rng = rand::thread_rng();
@@ -31,8 +34,6 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
         let mut queue = start_queue.clone();
         let mut people = PeopleAllocation::new(people);
 
-        let mut t = 0;
-
         while !queue.is_empty() {
             let Some(task) = queue
                 .available()
@@ -42,23 +43,35 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
                 break;
             };
 
-            // FIXME: Draw duration from distribution
-            let duration = task.estimate.unwrap_or(1);
+            let duration = if task.r#type == TaskType::Milestone {
+                0
+            } else {
+                let estimated_duration = task.estimate.unwrap_or(1);
+                let log_normal = LogNormal::from_mean_cv(estimated_duration as f64, 0.5).unwrap();
+                log_normal.sample(&mut rand::thread_rng()).ceil() as u32
+            };
+
+            // Start time is the max of the end time of all dependencies
+            let dependencies_end = task
+                .dependencies
+                .iter()
+                .map(|id| plan[id].end)
+                .max()
+                .unwrap_or_default();
 
             // Find personnel to carry out this task (FIXME: randomize?)
-            let (person, start) = people.availabilities(t).next().unwrap();
+            let (person, start) = people.availabilities(dependencies_end).next().unwrap();
 
-            let end = t + duration;
+            let end = start + duration;
 
             people.book(person, start..end);
             plan.insert(task.uid.clone(), start..end);
-            t = people.earliest_availability();
 
             queue.remove(&task.uid);
 
             let stats = stats.get_mut(&task.uid).unwrap();
-            stats.start.insert(start as f64);
-            stats.end.insert(end as f64);
+            stats.start.add(start as f64);
+            stats.end.add(end as f64);
         }
     }
 
@@ -96,10 +109,6 @@ impl PeopleAllocation {
             .sorted_by_key(|(_, v)| *v)
     }
 
-    pub fn earliest_availability(&self) -> u32 {
-        self.booked_until.iter().min().copied().unwrap()
-    }
-
     pub fn book(&mut self, i: usize, interval: Interval) {
         if self.schedules[i].iter().any(|v| overlaps(&interval, v)) {
             panic!("Oops, double booking!");
@@ -112,3 +121,18 @@ impl PeopleAllocation {
 fn overlaps<A: PartialOrd>(a: &Range<A>, b: &Range<A>) -> bool {
     a.start < b.end && b.start < a.end
 }
+
+/**
+ * Query the range of the CKMS
+ *
+ * Discard the outer quantiles by some fraction
+ */
+pub fn query_minmax(ckms: &Quantogram, margin: f64) -> Range<f64> {
+    (ckms.quantile(margin).unwrap())..(ckms.quantile(1.0 - margin).unwrap())
+}
+
+pub fn convert_rng(rng: &Range<f64>) -> Range<u32> {
+    (rng.start as u32)..(rng.end as u32)
+}
+
+// P(working) = P(started) * (1 - P(stopped))

@@ -1,6 +1,7 @@
 use itertools::Itertools;
+use serde::Serialize;
 
-pub type Coord = u32;
+pub type Coord = i32;
 
 #[derive(Debug, Clone)]
 pub struct Svg {
@@ -8,10 +9,10 @@ pub struct Svg {
     pub paths: Vec<Path>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RenderedSvg {
-    pub view_box: (Coord, Coord, Coord, Coord),
-    pub rendered_paths: Vec<String>,
+    pub view_box: String,
+    pub paths: Vec<String>,
 }
 
 pub type Path = Vec<Segment>;
@@ -26,8 +27,11 @@ pub enum Segment {
 impl Svg {
     pub fn render(&self) -> RenderedSvg {
         RenderedSvg {
-            view_box: self.view_box,
-            rendered_paths: self.paths.iter().map(Self::render_path).collect(),
+            view_box: format!(
+                "{} {} {} {}",
+                self.view_box.0, self.view_box.1, self.view_box.2, self.view_box.3
+            ),
+            paths: self.paths.iter().map(Self::render_path).collect(),
         }
     }
 
