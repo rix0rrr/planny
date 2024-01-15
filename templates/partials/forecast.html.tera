@@ -7,35 +7,55 @@ The following tasks have a cycle!
 </ul>
 {% endif %}
 
+{# Not allowed to put a macro inside an if, so this goes here #}
+{% macro ruler(hscale) %}
+<div></div>
+<div></div>
+<div class="relative h-8 bg-gray-100 py-2">
+  {% for day in time_range %}
+    {% if day == 0 %}{% continue %}{% endif %}
+    {% if day % 5 == 0 %}{% set marker = true %}{% else %}{% set marker = false %}{% endif %}
+    <div
+      class="absolute text-xs text-gray-600 h-4 border-solid border-gray-400 {% if not marker %}border-l{% endif %}"
+      style="left: {{ day * hscale }}px;">{% if marker %}{{day}}{% endif %}</div>
+  {% endfor %}
+</div>
+{% endmacro ruler %}
+
 {% if task_timeline %}
 {% set hscale = 30 %}
 {% set vscale = 40 %}
 
-<div id="timeline-container" class="bg-blue-200 overflow-auto w-full px-4 pb-4">
-  <div class="grid gap-4 items-center" style="grid-template-columns: repeat(2, max-content);">
-  <div></div>
-  <div class="relative h-5">
-    {% for day in time_range %}
-      {% if day > 0 and day % 5 == 0 %}{% set marker = true %}{% else %}{% set marker = false %}{% endif %}
-      <div
-        class="absolute text-sm text-gray-600 h-full border-solid border-black {% if not marker %}border-l{% endif %}"
-        style="left: {{ day * hscale }}px;">{% if marker %}{{day}}{% endif %}</div>
-    {% endfor %}
-  </div>
+<div id="timeline-container" class="overflow-auto w-full px-4 pb-4">
+  <div class="grid gap-4 items-center" style="grid-template-columns: repeat(3, max-content);">
+
+  {{ self::ruler(hscale=hscale) }}
   {% for row in task_timeline %}
+    {% if row.task.type == "milestone" %}
+      {% set svg_fill = "fill-red-300" %}
+      {% set percentiles = "bg-red-500" %}
+      {% set text_color = "text-red-700" %}
+    {% else %}
+      {% set svg_fill = "fill-blue-100" %}
+      {% set percentiles = "bg-blue-500" %}
+      {% set text_color = "" %}
+    {% endif %}
   <!-- Label -->
-  <div class="{% if row.task.type == "milestone" %}text-red-700{% endif %}">
+  <div class="{{text_color}}">
+    {% if row.task.type == "milestone" %}📍{% endif %}
     {{row.task.id}} {{row.task.title}}
+  </div>
+  <div class="text-sm text-gray-400">
+    p50: {{ row.p50_finish | round(precision=1) }}<br>
+    p90: {{ row.p90_finish | round(precision=1) }}
   </div>
   <!-- Track container -->
   <div>
-  <!-- Track -->
+    <!-- Track -->
     <div class="relative border-b-2 border-solid border-blue-300" style="height: {{vscale}}px; width: {{ row.full_rng.end * hscale }}px;">
       <!-- Full -->
       <svg
-        class="absolute h-full
-        {% if row.task.type == "milestone" %}fill-red-300{% else %}fill-white{% endif %}
-        "
+        class="absolute h-full {{ svg_fill }}"
         style="left: {{ row.full_rng.start * hscale }}px; width: {{ row.full_rng.end * hscale - row.full_rng.start * hscale }}px;"
         xmlns="http://www.w3.org/2000/svg" viewBox="{{ row.full_svg.view_box }}"
         width="100%" height="100%" preserveAspectRatio="none"
@@ -43,11 +63,33 @@ The following tasks have a cycle!
 
         <path d="{{ row.full_svg.paths.0 }}" />
       </svg>
+      <div
+        class="absolute h-full {{percentiles}} w-2 opacity-20"
+        style="left: {{ row.p50_finish * hscale }}px"
+        title="p50 end: {{ row.p50_finish | round(precision=1) }}"
+        ></div>
+      <div
+        class="absolute h-full {{percentiles}} w-2 opacity-50"
+        style="left: {{ row.p90_finish * hscale }}px"
+        title="p90 end: {{ row.p90_finish | round(precision=1) }}"
+        ></div>
     </div>
   </div>
-
   {% endfor %}
+
+  {{ self::ruler(hscale=hscale) }}
   </div>
 </div>
+
+<table class="ml-4">
+  <tr>
+    <th>p50 finish</th>
+    <td>{{ p50_finish | round(precision=1) }}</td>
+  </tr>
+  <tr>
+    <th>p90 finish</th>
+    <td>{{ p90_finish | round(precision=1) }}</td>
+  </tr>
+</table>
 
 {% endif %}

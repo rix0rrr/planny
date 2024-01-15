@@ -12,6 +12,7 @@ use db::Database;
 use forecast::simulate_tasks;
 use ids::unique_id;
 use itertools::Itertools;
+use ordered_float::OrderedFloat;
 use rocket::{
     form::Form,
     fs::{relative, FileServer},
@@ -204,6 +205,9 @@ fn get_forecast(project_uid: &str, db: &State<Db>) -> AnyResult<Option<Template>
         task: Task,
         full_rng: Range<u32>,
         full_svg: RenderedSvg,
+        p50_start: OrderedFloat<f64>,
+        p50_finish: OrderedFloat<f64>,
+        p90_finish: OrderedFloat<f64>,
     }
     let task_timeline: Vec<TaskPrediction> = sorted_tasks
         .sorted_tasks
@@ -213,26 +217,38 @@ fn get_forecast(project_uid: &str, db: &State<Db>) -> AnyResult<Option<Template>
 
             let start_rng = convert_rng(&query_minmax(&rng.start, 0.01));
             let end_rng = convert_rng(&query_minmax(&rng.end, 0.01));
-
             let full_rng = start_rng.start..end_rng.end;
 
-            println!("Task {} {:?}", task.id, full_rng);
+            let p50_start = rng.start.quantile(0.5).unwrap();
+            let p50_finish = rng.end.quantile(0.5).unwrap();
+            let p90_finish = rng.end.quantile(0.9).unwrap();
+
+            println!("Task {} {:?} {}", task.id, full_rng, p50_finish);
 
             TaskPrediction {
                 task: task.clone(),
                 full_svg: render_dist(&rng.start, &rng.end, &full_rng).render(),
                 full_rng,
+                p50_start: p50_start.into(),
+                p50_finish: p50_finish.into(),
+                p90_finish: p90_finish.into(),
             }
         })
+        .sorted_by_key(|x| x.p50_start)
         .collect();
 
     let time_range = task_timeline.iter().fold(0..0, |r, x| {
         min(r.start, x.full_rng.start)..max(r.end, x.full_rng.end)
     });
 
+    let p50_finish = task_timeline.iter().map(|t| t.p50_finish).max();
+    let p90_finish = task_timeline.iter().map(|t| t.p90_finish).max();
+
     Ok(Some(Template::render(
         "partials/forecast",
         context! {
+            p50_finish,
+            p90_finish,
             task_timeline,
             time_range: time_range.collect_vec(),
         },

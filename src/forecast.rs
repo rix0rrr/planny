@@ -1,7 +1,8 @@
 use itertools::Itertools;
+use ordered_float::OrderedFloat;
 use rand::seq::IteratorRandom;
 use rand_distr::{Distribution, LogNormal}; // 0.7.2
-use std::{cmp::max, collections::HashMap, ops::Range};
+use std::{collections::HashMap, ops::Range};
 
 use quantogram::Quantogram;
 
@@ -30,7 +31,7 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
     for _ in 0..N {
         // FIXME: Parallellism between peeps
 
-        let mut plan: HashMap<String, Range<u32>> = HashMap::new();
+        let mut plan: HashMap<String, Range<f64>> = HashMap::new();
         let mut queue = start_queue.clone();
         let mut people = PeopleAllocation::new(people);
 
@@ -44,7 +45,7 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
             };
 
             let duration = if task.r#type == TaskType::Milestone {
-                0
+                0.0
             } else {
                 // Based in this guy's musings:
                 // https://erikbern.com/2019/04/15/why-software-projects-take-longer-than-you-think-a-statistical-model.html
@@ -59,7 +60,7 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
                 let log_normal = LogNormal::from_mean_cv(1.0, sigma).unwrap();
 
                 let blowup = log_normal.sample(&mut rand::thread_rng());
-                (estimated_duration * blowup).ceil() as u32
+                estimated_duration * blowup
             };
 
             // Start time is the max of the end time of all dependencies
@@ -67,8 +68,7 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
                 .dependencies
                 .iter()
                 .map(|id| plan[id].end)
-                .max()
-                .unwrap_or_default();
+                .fold(0.0_f64, |a, b| a.max(b));
 
             // Find personnel to carry out this task (FIXME: randomize?)
             let (person, start) = people.availabilities(dependencies_end).next().unwrap();
@@ -81,8 +81,8 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
             queue.remove(&task.uid);
 
             let stats = stats.get_mut(&task.uid).unwrap();
-            stats.start.add(start as f64);
-            stats.end.add(end as f64);
+            stats.start.add(start);
+            stats.end.add(end);
         }
     }
 
@@ -93,38 +93,39 @@ pub fn queue_from_tasks<'a>(tasks: impl Iterator<Item = &'a Task>) -> TopoQueue 
     TopoQueue::from_iter(tasks.map(|t| (t.uid.clone(), t.dependencies.clone())))
 }
 
-type Interval = Range<u32>;
+type Interval = Range<f64>;
 
 type Schedule = Vec<Interval>;
 
 #[derive(Debug, Clone)]
 struct PeopleAllocation {
     schedules: Vec<Schedule>,
-    booked_until: Vec<u32>,
+    booked_until: Vec<OrderedFloat<f64>>,
 }
 
 impl PeopleAllocation {
     pub fn new(n: u32) -> Self {
         PeopleAllocation {
             schedules: (0..n).map(|_| vec![]).collect(),
-            booked_until: (0..n).map(|_| 0).collect(),
+            booked_until: (0..n).map(|_| 0.0.into()).collect(),
         }
     }
 
     /// Return the availabilities for all people starting at a given t, earliest available first
-    pub fn availabilities(&self, start: u32) -> impl Iterator<Item = (usize, u32)> + '_ {
+    pub fn availabilities(&self, start: f64) -> impl Iterator<Item = (usize, f64)> + '_ {
         self.booked_until
             .iter()
-            .map(move |b| max(*b, start))
+            .map(move |b| OrderedFloat::from(start.max(**b)))
             .enumerate()
             .sorted_by_key(|(_, v)| *v)
+            .map(|(i, v)| (i, v.0))
     }
 
     pub fn book(&mut self, i: usize, interval: Interval) {
         if self.schedules[i].iter().any(|v| overlaps(&interval, v)) {
             panic!("Oops, double booking!");
         }
-        self.booked_until[i] = max(self.booked_until[i], interval.end);
+        self.booked_until[i] = self.booked_until[i].max(interval.end.into());
         self.schedules[i].push(interval);
     }
 }

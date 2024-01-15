@@ -21,8 +21,8 @@
             name="type"
             class="text-xl bg-transparent p-2"
             >
-            <option value="task" {% if typ == "task" %}selected{% endif %}>✍</option>
-            <option value="milestone" {% if typ == "milestone" %}selected{% endif %}>🏁</option>
+            <option value="task" {% if typ == "task" %}selected{% endif %}>📝</option>
+            <option value="milestone" {% if typ == "milestone" %}selected{% endif %}>📍</option>
           </select>
         </td>
         <td>

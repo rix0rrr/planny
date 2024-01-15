@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = "1.0.76"
 human-sort = "0.2.2"
 itertools = "0.12.0"
+ordered-float = { version = "4.2.0", features=["serde"] }
 petgraph = "0.6.4"
 quantogram = "0.4.4"
 rand = "0.8.5"
