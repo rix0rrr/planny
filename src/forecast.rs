@@ -48,7 +48,7 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
             } else {
                 // Based in this guy's musings:
                 // https://erikbern.com/2019/04/15/why-software-projects-take-longer-than-you-think-a-statistical-model.html
-                let estimated_duration = task.estimate.unwrap_or(1);
+                let estimated_duration = task.estimate.unwrap_or(1.0);
 
                 let sigma = match task.risk.as_ref().copied().unwrap_or_default() {
                     Risk::Low => 0.25,
@@ -59,7 +59,7 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
                 let log_normal = LogNormal::from_mean_cv(1.0, sigma).unwrap();
 
                 let blowup = log_normal.sample(&mut rand::thread_rng());
-                (estimated_duration as f64 * blowup).ceil() as u32
+                (estimated_duration * blowup).ceil() as u32
             };
 
             // Start time is the max of the end time of all dependencies
@@ -143,7 +143,7 @@ pub fn query_minmax(ckms: &Quantogram, margin: f64) -> Range<f64> {
 }
 
 pub fn convert_rng(rng: &Range<f64>) -> Range<u32> {
-    (rng.start as u32)..(rng.end as u32)
+    (rng.start as u32)..(rng.end.ceil() as u32)
 }
 
 // P(working) = P(started) * (1 - P(stopped))

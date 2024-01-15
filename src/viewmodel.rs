@@ -43,7 +43,7 @@ pub struct TaskView {
     pub typ: TaskType,
     pub id: String,
     pub title: String,
-    pub estimate: Option<u32>,
+    pub estimate: Option<f64>,
     pub risk: Option<Risk>,
     pub dependencies: Vec<TaskDependencyView>,
 }

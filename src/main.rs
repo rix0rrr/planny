@@ -258,7 +258,7 @@ fn post_tasks(project_uid: &str, form: Form<TaskForm>, db: &State<Db>) -> AnyRes
             r#type: Some(form.r#type.clone()),
             id: Some(form.id.clone()),
             title: Some(form.title.clone()),
-            estimate: form.estimate.as_ref().map(|x| x.parse::<u32>().ok()),
+            estimate: form.estimate.as_ref().map(|x| x.parse::<f64>().ok()),
             risk: form.risk.as_ref().map(|risk| Some(*risk)),
             add_dependencies,
             remove_dependencies: vec![],

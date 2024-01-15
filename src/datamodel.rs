@@ -14,7 +14,7 @@ pub struct Task {
     pub r#type: TaskType,
     pub id: String,
     pub title: String,
-    pub estimate: Option<u32>,
+    pub estimate: Option<f64>,
     pub risk: Option<Risk>,
     pub dependencies: HashSet<String>,
     // TODO: Max parallellization, specialization
@@ -95,7 +95,7 @@ pub struct TaskUpdate {
     pub r#type: Option<TaskType>,
     pub id: Option<String>,
     pub title: Option<String>,
-    pub estimate: Option<Option<u32>>,
+    pub estimate: Option<Option<f64>>,
     pub risk: Option<Option<Risk>>,
     pub add_dependencies: Vec<String>,
     pub remove_dependencies: Vec<String>,
@@ -110,7 +110,7 @@ impl TaskUpdate {
             id: self.id.unwrap_or(task.id.clone()),
             title: self.title.unwrap_or(task.title.clone()),
             estimate: self.estimate.unwrap_or(task.estimate),
-            risk: self.risk.unwrap_or(task.risk.clone()),
+            risk: self.risk.unwrap_or(task.risk),
             dependencies: {
                 let mut deps = task.dependencies.clone();
                 for d in self.add_dependencies {
