@@ -80,7 +80,7 @@ impl Task {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, FromFormField, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, FromFormField, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Risk {
     Low,

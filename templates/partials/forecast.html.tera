@@ -24,7 +24,7 @@ The following tasks have a cycle!
   </div>
   {% for row in task_timeline %}
   <!-- Label -->
-  <div class="{% if row.task.type == "Milestone" %}color-red{% endif %}">
+  <div class="{% if row.task.type == "milestone" %}text-red-700{% endif %}">
     {{row.task.id}} {{row.task.title}}
   </div>
   <!-- Track container -->
@@ -33,13 +33,15 @@ The following tasks have a cycle!
     <div class="relative border-b-2 border-solid border-blue-300" style="height: {{vscale}}px; width: {{ row.full_rng.end * hscale }}px;">
       <!-- Full -->
       <svg
-        class="absolute h-full"
+        class="absolute h-full
+        {% if row.task.type == "milestone" %}fill-red-300{% else %}fill-white{% endif %}
+        "
         style="left: {{ row.full_rng.start * hscale }}px; width: {{ row.full_rng.end * hscale - row.full_rng.start * hscale }}px;"
         xmlns="http://www.w3.org/2000/svg" viewBox="{{ row.full_svg.view_box }}"
         width="100%" height="100%" preserveAspectRatio="none"
         >
 
-        <path d="{{ row.full_svg.paths.0 }}" fill="white" />
+        <path d="{{ row.full_svg.paths.0 }}" />
       </svg>
     </div>
   </div>

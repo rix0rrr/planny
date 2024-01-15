@@ -6,7 +6,7 @@ use std::{cmp::max, collections::HashMap, ops::Range};
 use quantogram::Quantogram;
 
 use crate::{
-    datamodel::{Task, TaskType},
+    datamodel::{Risk, Task, TaskType},
     topo_queue::TopoQueue,
 };
 
@@ -46,9 +46,20 @@ pub fn simulate_tasks(tasks: impl Iterator<Item = Task>, people: u32) -> Simulat
             let duration = if task.r#type == TaskType::Milestone {
                 0
             } else {
+                // Based in this guy's musings:
+                // https://erikbern.com/2019/04/15/why-software-projects-take-longer-than-you-think-a-statistical-model.html
                 let estimated_duration = task.estimate.unwrap_or(1);
-                let log_normal = LogNormal::from_mean_cv(estimated_duration as f64, 0.5).unwrap();
-                log_normal.sample(&mut rand::thread_rng()).ceil() as u32
+
+                let sigma = match task.risk.as_ref().copied().unwrap_or_default() {
+                    Risk::Low => 0.25,
+                    Risk::Medium => 0.5,
+                    Risk::High => 1.0,
+                };
+
+                let log_normal = LogNormal::from_mean_cv(1.0, sigma).unwrap();
+
+                let blowup = log_normal.sample(&mut rand::thread_rng());
+                (estimated_duration as f64 * blowup).ceil() as u32
             };
 
             // Start time is the max of the end time of all dependencies

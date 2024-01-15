@@ -12,6 +12,8 @@
     </thead>
     <tbody>
       {% macro row(uid, id, typ, title, estimate, risk, deps) %}
+        {% set input_color = "" %}
+        {% if typ == "milestone" %}{% set input_color="text-red-600" %}{% endif %}
         <input type="hidden" name="uid" value="{{ uid }}">
         <td>
           <select
@@ -30,7 +32,7 @@
             name="id"
             placeholder="ID"
             value="{{ id }}"
-            class="w-12 px-2 py-1"
+            class="w-12 px-2 py-1 {{input_color}}"
             >
         </td>
         <td>
@@ -39,7 +41,7 @@
             name="title"
             placeholder="Title"
             value="{{ title }}"
-            class="w-96 px-2 py-1"
+            class="w-96 px-2 py-1 {{input_color}}"
             >
         </td>
         {% if typ == 'task' %}

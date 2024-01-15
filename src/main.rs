@@ -259,7 +259,7 @@ fn post_tasks(project_uid: &str, form: Form<TaskForm>, db: &State<Db>) -> AnyRes
             id: Some(form.id.clone()),
             title: Some(form.title.clone()),
             estimate: form.estimate.as_ref().map(|x| x.parse::<u32>().ok()),
-            risk: form.risk.as_ref().map(|risk| Some(risk.clone())),
+            risk: form.risk.as_ref().map(|risk| Some(*risk)),
             add_dependencies,
             remove_dependencies: vec![],
         })?;
